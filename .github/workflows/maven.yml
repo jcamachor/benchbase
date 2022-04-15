@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        profile: [ 'cockroachdb', 'mariadb', 'mysql', 'postgres', 'spanner', 'phoenix' ]
+        profile: [ 'cockroachdb', 'mariadb', 'mysql', 'postgres', 'spanner', 'phoenix', 'sqlserver' ]
     steps:
     - name: Checkout repo
       uses: actions/checkout@v2
@@ -243,3 +243,48 @@ jobs:
       - name: Run benchmark
         run: |
           java -jar benchbase.jar -b ${{matrix.benchmark}} -c config/cockroachdb/sample_${{matrix.benchmark}}_config.xml --create=true --load=true --execute=true
+
+  sqlserver:
+    needs: package-and-upload
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # TODO: add more benchmarks
+        benchmark: [ 'tpch' ]
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        env:
+          ACCEPT_EULA: Y
+          SA_PASSWORD: SApassword1
+        ports:
+          - 1433:1433
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: benchbase-sqlserver
+
+      - name: Extract artifact
+        run: |
+          tar xvzf benchbase-sqlserver.tgz --strip-components=1
+
+      - name: Delete artifact
+        run: |
+          rm -rf benchbase-sqlserver.tgz
+
+      - name: Set up JDK
+        uses: actions/setup-java@v2
+        with:
+          java-version: ${{env.JAVA_VERSION}}
+          distribution: 'temurin'
+
+      - name: Run benchmark
+        run: |
+          docker exec sqlserver /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q "CREATE DATABASE benchbase_${{ matrix.benchmark }};"
+          docker exec sqlserver /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q "CREATE LOGIN benchuser_${{ matrix.benchmark }} WITH PASSWORD='P@ssw0rd';"
+          docker exec sqlserver /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q "USE benchbase_${{ matrix.benchmark }}; CREATE USER benchuser_${{ matrix.benchmark }} FROM LOGIN ${{ matrix.benchmark }}; EXEC sp_addrolemember 'db_owner', '${{ matrix.benchmark }}';"
+          docker exec sqlserver /opt/mssql-tools/bin/sqlcmd -U benchuser_${{ matrix.benchmark }} -P P@ssw0rd -S localhost -d benchbase_${{ matrix.benchmark }} -Q "SELECT 1;"
+          java -jar benchbase.jar -b ${{matrix.benchmark}} -c config/sqlserver/sample_${{matrix.benchmark}}_config.xml --create=true --load=true --execute=true
+
+# vim: set et ts=2 sw=2:
