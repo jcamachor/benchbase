@@ -285,11 +285,13 @@ jobs:
           distribution: 'temurin'
 
       - name: Run benchmark
+        # Note: user/pass should match those used in sample configs.
         run: |
-          # Note: user/pass should match those used in sample configs.
-          docker exec sqlserver /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q "CREATE DATABASE benchbase_${{ matrix.benchmark }};"
-          docker exec sqlserver /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q "CREATE LOGIN benchuser01 WITH PASSWORD='P@ssw0rd';"
-          docker exec sqlserver /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q \
+          container_id=$(docker ps --filter status=running --filter publish=1433 --no-trunc --format '{{ .ID }}')
+          echo "$container_id"
+          docker exec $container_id /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q "CREATE DATABASE benchbase_${{ matrix.benchmark }};"
+          docker exec $container_id /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q "CREATE LOGIN benchuser01 WITH PASSWORD='P@ssw0rd';"
+          docker exec $container_id /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q \
             "USE benchbase_${{ matrix.benchmark }}; CREATE USER benchuser01 FROM LOGIN benchuser01; EXEC sp_addrolemember 'db_owner', 'benchuser01';"
-          docker exec sqlserver /opt/mssql-tools/bin/sqlcmd -U benchuser01 -P P@ssw0rd -S localhost -d benchbase_${{ matrix.benchmark }} -Q "SELECT 1;"
+          docker exec $container_id /opt/mssql-tools/bin/sqlcmd -U benchuser01 -P P@ssw0rd -S localhost -d benchbase_${{ matrix.benchmark }} -Q "SELECT 1;"
           java -jar benchbase.jar -b ${{matrix.benchmark}} -c config/sqlserver/sample_${{matrix.benchmark}}_config.xml --create=true --load=true --execute=true
