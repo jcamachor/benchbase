@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <parameters>
+
     <!-- Connection details -->
-    <type>SQLSERVER</type>
+    <type>sqlserver</type>
     <driver>com.microsoft.sqlserver.jdbc.SQLServerDriver</driver>
     <url>jdbc:sqlserver://localhost:1433;encrypt=false;database=benchbase_tpch;</url>
     <username>benchuser01</username>
