@@ -8,29 +8,6 @@ DROP TABLE IF EXISTS supplier;
 DROP TABLE IF EXISTS nation;
 DROP TABLE IF EXISTS region;
 
--- Create date partition function with increment by week.
-IF EXISTS(SELECT * FROM sys.partition_schemes WHERE name = 'DatePartitionScheme')
-  DROP PARTITION SCHEME DatePartitionScheme;
-IF EXISTS(SELECT * FROM sys.partition_functions WHERE name = 'DatePartitionFunction')
-  DROP PARTITION FUNCTION DatePartitionFunction;
-DECLARE @DatePartitionFunction NVARCHAR(max) =
-    N'CREATE PARTITION FUNCTION DatePartitionFunction (DATE)
-    AS RANGE LEFT FOR VALUES (';
-DECLARE @DateScheme NVARCHAR(max) =
-    N'CREATE PARTITION SCHEME DatePartitionScheme
-    AS PARTITION DatePartitionFunction TO ('
-DECLARE @i DATE = '19920107';
-WHILE @i < '19981124'
-BEGIN
-    SET @DatePartitionFunction += '''' + CAST(@i AS NVARCHAR(10)) + '''' + N', ';
-    SET @DateScheme += '[PRIMARY], ';
-    SET @i = DATEADD(ww, 1, @i);
-END
-SET @DatePartitionFunction += '''' + CAST(@i AS NVARCHAR(10))+ '''' + N');';
-SET @DateScheme += '[PRIMARY], [PRIMARY]);';
-EXEC sp_executesql @DatePartitionFunction;
-EXEC sp_executesql @DateScheme;
-
 CREATE TABLE region (
     r_regionkey integer  NOT NULL,
     r_name      char(25) NOT NULL,
@@ -124,13 +101,13 @@ CREATE TABLE orders (
     o_clerk         char(15)       NOT NULL,
     o_shippriority  integer        NOT NULL,
     o_comment       varchar(79)    NOT NULL,
-    INDEX o_orderdate_idx CLUSTERED COLUMNSTORE, -- ON DatePartitionScheme(o_orderdate),
+    INDEX o_orderdate_idx CLUSTERED COLUMNSTORE,
     -- PRIMARY KEY (o_orderkey),
     INDEX o_ok UNIQUE (o_orderkey ASC),
     INDEX o_ck (o_custkey ASC),
-    INDEX o_od (o_orderdate ASC), -- ON DatePartitionScheme(o_orderdate),
+    INDEX o_od (o_orderdate ASC),
     FOREIGN KEY (o_custkey) REFERENCES customer (c_custkey)
-); -- ON DatePartitionScheme(o_orderdate);
+);
 
 CREATE TABLE lineitem (
     l_orderkey      integer        NOT NULL,
@@ -149,16 +126,16 @@ CREATE TABLE lineitem (
     l_shipinstruct  char(25)       NOT NULL,
     l_shipmode      char(10)       NOT NULL,
     l_comment       varchar(44)    NOT NULL,
-    INDEX l_shipdate_idx CLUSTERED COLUMNSTORE ON DatePartitionScheme(l_shipdate),
+    INDEX l_shipdate_idx CLUSTERED COLUMNSTORE,
     -- PRIMARY KEY (l_orderkey, l_linenumber),
     INDEX l_ok (l_orderkey ASC),
     INDEX l_pk (l_partkey ASC),
     INDEX l_sk (l_suppkey ASC),
-    INDEX l_sd (l_shipdate ASC) ON DatePartitionScheme(l_shipdate),
+    INDEX l_sd (l_shipdate ASC),
     INDEX l_cd (l_commitdate ASC),
     INDEX l_rd (l_receiptdate ASC),
     INDEX l_pk_sk (l_partkey ASC, l_suppkey ASC),
     INDEX l_sk_pk (l_suppkey ASC, l_partkey ASC),
     FOREIGN KEY (l_orderkey) REFERENCES orders (o_orderkey),
     FOREIGN KEY (l_partkey, l_suppkey) REFERENCES partsupp (ps_partkey, ps_suppkey)
-) ON DatePartitionScheme(l_shipdate);
+);
