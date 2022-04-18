@@ -284,14 +284,25 @@ jobs:
           java-version: ${{env.JAVA_VERSION}}
           distribution: 'temurin'
 
+      - name: Setup database
+        uses: docker://mcr.microsoft.com/mssql-tools:latest
+        with:
+          entrypoint: /opt/mssql-tools/bin/sqlcmd
+          args: -U sa -P SApassword1 -S sqlserver -b -Q "CREATE DATABASE benchbase_${{ matrix.benchmark }};"
+
+      - name: Setup login
+        uses: docker://mcr.microsoft.com/mssql-tools:latest
+        with:
+          entrypoint: /opt/mssql-tools/bin/sqlcmd
+          args: -U sa -P SApassword1 -S sqlserver -Q "CREATE LOGIN benchuser01 WITH PASSWORD='P@ssw0rd';"
+
+      - name: Setup access
+        uses: docker://mcr.microsoft.com/mssql-tools:latest
+        with:
+          entrypoint: /opt/mssql-tools/bin/sqlcmd
+          args: -U sa -P SApassword1 -S sqlserver -b -Q "USE benchbase_${{ matrix.benchmark }}; CREATE USER benchuser01 FROM LOGIN benchuser01; EXEC sp_addrolemember 'db_owner', 'benchuser01';"
+
       - name: Run benchmark
         # Note: user/pass should match those used in sample configs.
         run: |
-          container_id=$(docker ps --filter status=running --filter publish=1433 --no-trunc --format '{{ .ID }}')
-          echo "$container_id"
-          docker exec $container_id /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q "CREATE DATABASE benchbase_${{ matrix.benchmark }};"
-          docker exec $container_id /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q "CREATE LOGIN benchuser01 WITH PASSWORD='P@ssw0rd';"
-          docker exec $container_id /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q \
-            "USE benchbase_${{ matrix.benchmark }}; CREATE USER benchuser01 FROM LOGIN benchuser01; EXEC sp_addrolemember 'db_owner', 'benchuser01';"
-          docker exec $container_id /opt/mssql-tools/bin/sqlcmd -U benchuser01 -P P@ssw0rd -S localhost -d benchbase_${{ matrix.benchmark }} -Q "SELECT 1;"
           java -jar benchbase.jar -b ${{matrix.benchmark}} -c config/sqlserver/sample_${{matrix.benchmark}}_config.xml --create=true --load=true --execute=true
