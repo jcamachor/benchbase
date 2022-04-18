@@ -250,7 +250,7 @@ jobs:
     strategy:
       matrix:
         # TODO: add more benchmarks
-        benchmark: [ 'tpch' ]
+        benchmark: [ 'tpcc', 'tpch' ]
     services:
       sqlserver:
         image: mcr.microsoft.com/mssql/server:2019-latest
@@ -281,6 +281,7 @@ jobs:
 
       - name: Run benchmark
         run: |
+          # Note: user/pass should match those used in sample configs.
           docker exec sqlserver /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q "CREATE DATABASE benchbase_${{ matrix.benchmark }};"
           docker exec sqlserver /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q "CREATE LOGIN benchuser01 WITH PASSWORD='P@ssw0rd';"
           docker exec sqlserver /opt/mssql-tools/bin/sqlcmd -U sa -P SApassword1 -S localhost -Q \
